@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CENTRALUX BARCODE - Controle de Estoque</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <div class="glass-container">
+        <header>
+            <h1>CENTRALUX <span>BARCODE</span></h1>
+            <div class="status-indicator" id="scan-status">Aguardando leitura...</div>
+        </header>
+
+        <main>
+            <section class="scanner-section">
+                <div class="scanner-card">
+                    <div class="scan-animation"></div>
+                    <p>Posicione o leitor Eyoyo EY-024 e scaneie a caixa</p>
+                    <input type="text" id="barcode-input" autofocus autocomplete="off">
+                </div>
+            </section>
+
+            <section class="stats-grid">
+                <div class="stat-card" id="total-scanned">
+                    <h3>Total Scaneado</h3>
+                    <p class="value">0</p>
+                </div>
+                <div class="stat-card" id="remaining-items">
+                    <h3>Itens Restantes</h3>
+                    <p class="value">0</p>
+                </div>
+                <div class="stat-card warning" id="extra-items">
+                    <h3>Itens Extras</h3>
+                    <p class="value">0</p>
+                </div>
+            </section>
+
+            <section class="inventory-section">
+                <h2>Lista de Conferência</h2>
+                <div class="table-container">
+                    <table id="inventory-table">
+                        <thead>
+                            <tr>
+                                <th>Produto</th>
+                                <th>Código</th>
+                                <th>Esperado</th>
+                                <th>Confirmado</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Data will be populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <div id="toast-container"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>
