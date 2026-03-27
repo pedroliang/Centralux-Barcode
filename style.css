@@ -50,6 +50,36 @@ header {
     margin-bottom: 3rem;
 }
 
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.btn-icon {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 0.6rem;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-icon:hover {
+    background: rgba(255, 255, 255, 0.1);
+    transform: scale(1.05);
+}
+
+.btn-icon.danger:hover {
+    background: rgba(255, 45, 85, 0.1);
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
 h1 {
     font-size: 1.8rem;
     font-weight: 700;
@@ -59,6 +89,7 @@ h1 {
 h1 span {
     color: var(--primary);
     background: linear-gradient(90deg, var(--primary), var(--secondary));
+    background-clip: text;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
 }
@@ -79,8 +110,85 @@ h1 span {
     100% { opacity: 0.6; }
 }
 
-.scanner-section {
-    margin-bottom: 3rem;
+.config-panel {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    animation: fadeIn 0.3s ease;
+}
+
+.hidden { display: none; }
+
+.mode-selector {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.btn-mode {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    padding: 0.5rem 1rem;
+    border-radius: 10px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+}
+
+.btn-mode.active {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+}
+
+.btn-remove {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 0.3rem;
+    border-radius: 6px;
+    transition: all 0.2s;
+}
+
+.btn-remove:hover {
+    color: var(--accent);
+    background: rgba(255, 45, 85, 0.1);
+}
+
+.config-form {
+    display: grid;
+    grid-template-columns: 2fr 2fr 1fr auto;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.config-form input {
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--border);
+    padding: 0.8rem 1rem;
+    border-radius: 12px;
+    color: var(--text);
+    font-family: inherit;
+}
+
+.btn-primary {
+    background: var(--primary);
+    color: white;
+    border: none;
+    padding: 0.8rem 1.5rem;
+    border-radius: 12px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 .scanner-card {

@@ -6,16 +6,35 @@
     <title>CENTRALUX BARCODE - Controle de Estoque</title>
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@0.473.0"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 </head>
 <body>
     <div class="glass-container">
         <header>
             <h1>CENTRALUX <span>BARCODE</span></h1>
-            <div class="status-indicator" id="scan-status">Aguardando leitura...</div>
+            <div class="header-actions">
+                <button onclick="toggleConfig()" class="btn-icon"><i data-lucide="settings"></i></button>
+                <button onclick="resetData()" class="btn-icon danger"><i data-lucide="trash-2"></i></button>
+                <div class="status-indicator" id="scan-status">Aguardando leitura...</div>
+            </div>
         </header>
 
         <main>
+            <section id="config-panel" class="config-panel hidden">
+                <h2>Configuração de Produtos</h2>
+                <div class="mode-selector">
+                    <button id="mode-subtract" class="btn-mode active" onclick="setMode('subtract')">Modo Subtração (Lista)</button>
+                    <button id="mode-sum" class="btn-mode" onclick="setMode('sum')">Modo Soma (Livre)</button>
+                </div>
+                <div class="config-form">
+                    <input type="text" id="new-name" placeholder="Nome do Produto">
+                    <input type="text" id="new-barcode" placeholder="Código de Barras">
+                    <input type="number" id="new-expected" placeholder="Qtd Esperada">
+                    <button onclick="addItem()" class="btn-primary">Adicionar</button>
+                </div>
+            </section>
+
             <section class="scanner-section">
                 <div class="scanner-card">
                     <div class="scan-animation"></div>
@@ -50,6 +69,7 @@
                                 <th>Esperado</th>
                                 <th>Confirmado</th>
                                 <th>Status</th>
+                                <th>Ações</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -64,5 +84,8 @@
     <div id="toast-container"></div>
 
     <script src="app.js"></script>
+    <script>
+        lucide.createIcons();
+    </script>
 </body>
 </html>
