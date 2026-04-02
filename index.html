@@ -1,91 +1,259 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CENTRALUX BARCODE - Controle de Estoque</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="description" content="Centralux Barcode - Sistema de leitura e registro de códigos de barras">
+    <meta name="theme-color" content="#0a0e1a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Centralux Barcode">
+
+    <title>Centralux Barcode — Login</title>
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%232563eb'/%3E%3Ctext x='50' y='62' text-anchor='middle' font-size='50' fill='white'%3E📊%3C/text%3E%3C/svg%3E">
+
+    <!-- Estilos -->
     <link rel="stylesheet" href="style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
-    <script src="https://unpkg.com/lucide@0.473.0"></script>
-    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+
+    <!-- Supabase JS via CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
-    <div class="glass-container">
-        <header>
-            <h1>CENTRALUX <span>BARCODE</span></h1>
-            <div class="header-actions">
-                <button onclick="toggleConfig()" class="btn-icon"><i data-lucide="settings"></i></button>
-                <button onclick="resetData()" class="btn-icon danger"><i data-lucide="trash-2"></i></button>
-                <div class="status-indicator" id="scan-status">Aguardando leitura...</div>
+
+    <!-- Container de Login -->
+    <div class="login-container" id="loginContainer">
+        <div class="login-card">
+            <!-- Logo -->
+            <div class="login-logo">
+                <div class="logo-icon">📊</div>
+                <h1>Centralux Barcode</h1>
+                <p>Sistema de leitura e registro de códigos de barras</p>
             </div>
-        </header>
 
-        <main>
-            <section id="config-panel" class="config-panel hidden">
-                <h2>Configuração de Produtos</h2>
-                <div class="mode-selector">
-                    <button id="mode-subtract" class="btn-mode active" onclick="setMode('subtract')">Modo Subtração (Lista)</button>
-                    <button id="mode-sum" class="btn-mode" onclick="setMode('sum')">Modo Soma (Livre)</button>
+            <!-- Formulário de Login -->
+            <form id="loginForm" autocomplete="on">
+                <div class="form-group">
+                    <label for="loginEmail">E-mail</label>
+                    <input type="email" id="loginEmail" class="form-input" placeholder="seu@email.com" required autocomplete="email">
                 </div>
-                <div class="config-form">
-                    <input type="text" id="new-name" placeholder="Nome do Produto">
-                    <input type="text" id="new-barcode" placeholder="Código de Barras">
-                    <input type="number" id="new-expected" placeholder="Qtd Esperada">
-                    <button onclick="addItem()" class="btn-primary">Adicionar</button>
-                </div>
-            </section>
 
-            <section class="scanner-section">
-                <div class="scanner-card">
-                    <div class="scan-animation"></div>
-                    <p>Posicione o leitor Eyoyo EY-024 e scaneie a caixa</p>
-                    <input type="text" id="barcode-input" autofocus autocomplete="off">
+                <div class="form-group">
+                    <label for="loginPassword">Senha</label>
+                    <input type="password" id="loginPassword" class="form-input" placeholder="Sua senha" required autocomplete="current-password">
                 </div>
-            </section>
 
-            <section class="stats-grid">
-                <div class="stat-card" id="total-scanned">
-                    <h3>Total Scaneado</h3>
-                    <p class="value">0</p>
-                </div>
-                <div class="stat-card" id="remaining-items">
-                    <h3>Itens Restantes</h3>
-                    <p class="value">0</p>
-                </div>
-                <div class="stat-card warning" id="extra-items">
-                    <h3>Itens Extras</h3>
-                    <p class="value">0</p>
-                </div>
-            </section>
+                <button type="submit" id="btnLogin" class="btn btn-primary btn-block btn-lg">
+                    <span id="loginBtnText">Entrar</span>
+                    <div id="loginSpinner" class="spinner hidden"></div>
+                </button>
+            </form>
 
-            <section class="inventory-section">
-                <h2>Lista de Conferência</h2>
-                <div class="table-container">
-                    <table id="inventory-table">
-                        <thead>
-                            <tr>
-                                <th>Produto</th>
-                                <th>Código</th>
-                                <th>Esperado</th>
-                                <th>Confirmado</th>
-                                <th>Status</th>
-                                <th>Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <!-- Data will be populated by JS -->
-                        </tbody>
-                    </table>
+            <!-- Divisor -->
+            <div class="divider">ou</div>
+
+            <!-- Magic Link -->
+            <form id="magicLinkForm">
+                <div class="form-group">
+                    <label for="magicEmail">Enviar link mágico por e-mail</label>
+                    <input type="email" id="magicEmail" class="form-input" placeholder="seu@email.com" autocomplete="email">
                 </div>
-            </section>
-        </main>
+                <button type="submit" id="btnMagicLink" class="btn btn-secondary btn-block">
+                    <span id="magicBtnText">✉️ Enviar Magic Link</span>
+                    <div id="magicSpinner" class="spinner hidden"></div>
+                </button>
+            </form>
+
+            <!-- Cadastro -->
+            <div class="divider">novo por aqui?</div>
+
+            <form id="signupForm" class="hidden">
+                <div class="form-group">
+                    <label for="signupEmail">E-mail</label>
+                    <input type="email" id="signupEmail" class="form-input" placeholder="seu@email.com" required autocomplete="email">
+                </div>
+                <div class="form-group">
+                    <label for="signupPassword">Senha (mínimo 6 caracteres)</label>
+                    <input type="password" id="signupPassword" class="form-input" placeholder="Crie uma senha" required minlength="6" autocomplete="new-password">
+                </div>
+                <button type="submit" id="btnSignup" class="btn btn-success btn-block">
+                    <span id="signupBtnText">Criar Conta</span>
+                    <div id="signupSpinner" class="spinner hidden"></div>
+                </button>
+            </form>
+
+            <button id="toggleSignup" class="btn btn-ghost btn-block mt-3" type="button">
+                Criar uma conta
+            </button>
+        </div>
     </div>
 
-    <div id="toast-container"></div>
+    <!-- Toast container -->
+    <div id="toastContainer" class="toast-container"></div>
 
-    <script src="app.js"></script>
+    <!-- Scripts -->
+    <script src="supabase.js"></script>
     <script>
-        lucide.createIcons();
+        // ============================================
+        // Lógica da Tela de Login
+        // ============================================
+
+        // Verificar se já está logado
+        (async () => {
+            const { data: { session } } = await supabaseClient.auth.getSession();
+            if (session) {
+                window.location.href = 'app.html';
+            }
+        })();
+
+        // Alternar visibilidade do formulário de cadastro
+        const signupForm = document.getElementById('signupForm');
+        const toggleBtn = document.getElementById('toggleSignup');
+
+        toggleBtn.addEventListener('click', () => {
+            const isHidden = signupForm.classList.contains('hidden');
+            signupForm.classList.toggle('hidden');
+            toggleBtn.textContent = isHidden ? 'Já tenho uma conta' : 'Criar uma conta';
+        });
+
+        // Login com email/senha
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('loginEmail').value.trim();
+            const password = document.getElementById('loginPassword').value;
+
+            const btnText = document.getElementById('loginBtnText');
+            const spinner = document.getElementById('loginSpinner');
+            const btn = document.getElementById('btnLogin');
+
+            btn.disabled = true;
+            btnText.textContent = 'Entrando...';
+            spinner.classList.remove('hidden');
+
+            try {
+                const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+
+                if (error) throw error;
+
+                showToast('Sucesso', 'Login realizado com sucesso!', 'success');
+                setTimeout(() => { window.location.href = 'app.html'; }, 500);
+            } catch (err) {
+                showToast('Erro no login', err.message || 'Credenciais inválidas', 'error');
+            } finally {
+                btn.disabled = false;
+                btnText.textContent = 'Entrar';
+                spinner.classList.add('hidden');
+            }
+        });
+
+        // Magic Link
+        document.getElementById('magicLinkForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('magicEmail').value.trim();
+
+            if (!email) {
+                showToast('Atenção', 'Informe seu e-mail', 'warning');
+                return;
+            }
+
+            const btnText = document.getElementById('magicBtnText');
+            const spinner = document.getElementById('magicSpinner');
+            const btn = document.getElementById('btnMagicLink');
+
+            btn.disabled = true;
+            btnText.textContent = 'Enviando...';
+            spinner.classList.remove('hidden');
+
+            try {
+                const { error } = await supabaseClient.auth.signInWithOtp({
+                    email,
+                    options: {
+                        emailRedirectTo: window.location.origin + '/app.html'
+                    }
+                });
+
+                if (error) throw error;
+
+                showToast('Link enviado!', 'Verifique sua caixa de entrada para acessar', 'success');
+            } catch (err) {
+                showToast('Erro', err.message || 'Não foi possível enviar o link', 'error');
+            } finally {
+                btn.disabled = false;
+                btnText.textContent = '✉️ Enviar Magic Link';
+                spinner.classList.add('hidden');
+            }
+        });
+
+        // Cadastro
+        document.getElementById('signupForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('signupEmail').value.trim();
+            const password = document.getElementById('signupPassword').value;
+
+            const btnText = document.getElementById('signupBtnText');
+            const spinner = document.getElementById('signupSpinner');
+            const btn = document.getElementById('btnSignup');
+
+            btn.disabled = true;
+            btnText.textContent = 'Criando conta...';
+            spinner.classList.remove('hidden');
+
+            try {
+                const { data, error } = await supabaseClient.auth.signUp({
+                    email,
+                    password,
+                    options: {
+                        emailRedirectTo: window.location.origin + '/app.html'
+                    }
+                });
+
+                if (error) throw error;
+
+                if (data.user && !data.session) {
+                    showToast('Conta criada!', 'Verifique seu e-mail para confirmar o cadastro', 'success');
+                } else if (data.session) {
+                    showToast('Sucesso', 'Conta criada com sucesso!', 'success');
+                    setTimeout(() => { window.location.href = 'app.html'; }, 500);
+                }
+            } catch (err) {
+                showToast('Erro no cadastro', err.message || 'Não foi possível criar a conta', 'error');
+            } finally {
+                btn.disabled = false;
+                btnText.textContent = 'Criar Conta';
+                spinner.classList.add('hidden');
+            }
+        });
+
+        // Função de toast
+        function showToast(title, message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const icons = { success: '✅', error: '❌', warning: '⚠️', info: 'ℹ️' };
+
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.innerHTML = `
+                <span class="toast-icon">${icons[type]}</span>
+                <div class="toast-content">
+                    <div class="toast-title">${title}</div>
+                    <div class="toast-message">${message}</div>
+                </div>
+                <button class="toast-close" onclick="this.parentElement.remove()">✕</button>
+            `;
+
+            container.appendChild(toast);
+            setTimeout(() => toast.remove(), 5000);
+        }
+    </script>
+
+    <!-- Service Worker -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js')
+                .then(reg => console.log('Service Worker registrado:', reg.scope))
+                .catch(err => console.error('Erro ao registrar SW:', err));
+        }
     </script>
 </body>
 </html>

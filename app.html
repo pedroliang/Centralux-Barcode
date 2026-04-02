@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="description" content="Centralux Barcode - Dashboard de gestão de códigos de barras">
+    <meta name="theme-color" content="#0a0e1a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Centralux Barcode">
+
+    <title>Centralux Barcode — Dashboard</title>
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%232563eb'/%3E%3Ctext x='50' y='62' text-anchor='middle' font-size='50' fill='white'%3E📊%3C/text%3E%3C/svg%3E">
+
+    <!-- Estilos -->
+    <link rel="stylesheet" href="style.css">
+
+    <!-- Supabase JS -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <!-- ZXing para leitura de barcode -->
+    <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"></script>
+</head>
+<body>
+    <!-- Layout principal -->
+    <div class="app-layout" id="appLayout">
+
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-left">
+                <div class="header-logo">
+                    <div class="logo-sm">📊</div>
+                    <h2>Centralux Barcode</h2>
+                </div>
+            </div>
+            <div class="header-right">
+                <div class="user-info">
+                    <span id="userEmail"></span>
+                    <div class="user-avatar" id="userAvatar"></div>
+                </div>
+                <button class="btn btn-ghost btn-icon" id="btnLogout" title="Sair">🚪</button>
+            </div>
+        </header>
+
+        <!-- Conteúdo principal -->
+        <main class="app-content">
+
+            <!-- ========== DASHBOARD ========== -->
+            <section id="sectionDashboard" class="page-section active">
+                <div class="section-header">
+                    <h1 class="section-title">Dashboard</h1>
+                </div>
+
+                <!-- Cards de estatísticas -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon blue">📦</div>
+                        <div class="stat-info">
+                            <h3 id="statItems">0</h3>
+                            <p>Itens cadastrados</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon green">📊</div>
+                        <div class="stat-info">
+                            <h3 id="statBarcodes">0</h3>
+                            <p>Códigos de barras</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon orange">📋</div>
+                        <div class="stat-info">
+                            <h3 id="statScansToday">0</h3>
+                            <p>Leituras hoje</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon purple">📈</div>
+                        <div class="stat-info">
+                            <h3 id="statScansTotal">0</h3>
+                            <p>Total de leituras</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Últimas leituras -->
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <h3 class="card-title">Últimas Leituras</h3>
+                            <p class="card-subtitle">Registros mais recentes</p>
+                        </div>
+                    </div>
+                    <div id="recentScans">
+                        <div class="empty-state">
+                            <div class="empty-icon">📷</div>
+                            <h3>Nenhuma leitura ainda</h3>
+                            <p>Use o scanner para registrar suas primeiras leituras</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ========== SCANNER ========== -->
+            <section id="sectionScanner" class="page-section">
+                <div class="section-header">
+                    <h1 class="section-title">Scanner</h1>
+                    <div class="session-counter">
+                        <span class="count" id="sessionCount">0</span>
+                        <span class="label">leituras nesta sessão</span>
+                    </div>
+                </div>
+
+                <div class="scanner-container">
+                    <!-- Viewport da câmera -->
+                    <div class="scanner-viewport" id="scannerViewport">
+                        <video id="scannerVideo" playsinline autoplay muted></video>
+                        <div class="scanner-overlay">
+                            <div class="scanner-frame">
+                                <div class="corner-bl"></div>
+                                <div class="corner-br"></div>
+                            </div>
+                            <div class="scan-line"></div>
+                        </div>
+                    </div>
+
+                    <!-- Status do scanner -->
+                    <div class="scanner-status" id="scannerStatus">
+                        Clique em "Iniciar Scanner" para começar
+                    </div>
+
+                    <!-- Botões do scanner -->
+                    <div class="flex gap-3 justify-between" style="max-width: 500px; margin: 0 auto; width: 100%;">
+                        <button class="btn btn-primary" id="btnStartScanner" style="flex:1;">
+                            📷 Iniciar Scanner
+                        </button>
+                        <button class="btn btn-danger hidden" id="btnStopScanner" style="flex:1;">
+                            ⏹️ Parar Scanner
+                        </button>
+                        <button class="btn btn-secondary" id="btnManualInput" style="flex:1;">
+                            ⌨️ Digitar Código
+                        </button>
+                    </div>
+
+                    <!-- Resultado da leitura -->
+                    <div id="scanResult" class="hidden">
+                        <!-- Preenchido dinamicamente -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- ========== CADASTRO ========== -->
+            <section id="sectionCadastro" class="page-section">
+                <div class="section-header">
+                    <h1 class="section-title">Cadastro de Itens</h1>
+                    <button class="btn btn-primary" id="btnNewItem">
+                        ➕ Novo Item
+                    </button>
+                </div>
+
+                <!-- Formulário de novo item -->
+                <div class="card hidden" id="itemFormCard">
+                    <div class="card-header">
+                        <h3 class="card-title" id="formTitle">Novo Item</h3>
+                        <button class="btn btn-ghost btn-icon" id="btnCloseForm">✕</button>
+                    </div>
+                    <form id="itemForm">
+                        <input type="hidden" id="editItemId">
+                        <div class="form-group">
+                            <label for="itemName">Nome / Descrição do item *</label>
+                            <input type="text" id="itemName" class="form-input" placeholder="Ex: Produto A" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="itemCode">Código interno *</label>
+                            <input type="text" id="itemCode" class="form-input" placeholder="Ex: PA-001" required>
+                        </div>
+
+                        <!-- Barcodes vinculados -->
+                        <div class="form-group">
+                            <label>Códigos de barras vinculados</label>
+                            <div class="flex gap-2 mb-2">
+                                <input type="text" id="barcodeInput" class="form-input" placeholder="Digite ou escaneie o código de barras" style="flex:1;">
+                                <button type="button" class="btn btn-secondary" id="btnAddBarcode">➕</button>
+                                <button type="button" class="btn btn-secondary" id="btnScanBarcode">📷</button>
+                            </div>
+                            <div id="barcodesList" class="item-card-barcodes">
+                                <!-- Tags de barcode serão adicionadas aqui -->
+                            </div>
+                        </div>
+
+                        <div class="flex gap-3">
+                            <button type="submit" class="btn btn-success" style="flex:1;">
+                                💾 Salvar Item
+                            </button>
+                            <button type="button" class="btn btn-secondary" id="btnCancelForm">
+                                Cancelar
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Lista de itens -->
+                <div class="card mt-4">
+                    <div class="card-header">
+                        <div>
+                            <h3 class="card-title">Itens Cadastrados</h3>
+                            <p class="card-subtitle" id="itemsCount">Carregando...</p>
+                        </div>
+                        <div class="flex gap-2">
+                            <input type="text" id="searchItems" class="form-input" placeholder="🔍 Buscar..." style="width: 200px;">
+                        </div>
+                    </div>
+                    <div id="itemsList" class="items-list">
+                        <div class="empty-state">
+                            <div class="empty-icon">📦</div>
+                            <h3>Nenhum item cadastrado</h3>
+                            <p>Clique em "Novo Item" para começar</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ========== HISTÓRICO ========== -->
+            <section id="sectionHistorico" class="page-section">
+                <div class="section-header">
+                    <h1 class="section-title">Histórico de Leituras</h1>
+                    <button class="btn btn-secondary" id="btnExportCSV">
+                        📥 Exportar CSV
+                    </button>
+                </div>
+
+                <!-- Filtros -->
+                <div class="card mb-4">
+                    <div class="filters-bar">
+                        <div class="form-group">
+                            <label for="filterDateStart">Data início</label>
+                            <input type="date" id="filterDateStart" class="form-input">
+                        </div>
+                        <div class="form-group">
+                            <label for="filterDateEnd">Data fim</label>
+                            <input type="date" id="filterDateEnd" class="form-input">
+                        </div>
+                        <div class="form-group">
+                            <label for="filterSearch">Buscar</label>
+                            <input type="text" id="filterSearch" class="form-input" placeholder="Item, código...">
+                        </div>
+                        <div class="form-group" style="align-self: flex-end;">
+                            <button class="btn btn-primary btn-sm" id="btnApplyFilters">🔍 Filtrar</button>
+                        </div>
+                        <div class="form-group" style="align-self: flex-end;">
+                            <button class="btn btn-ghost btn-sm" id="btnClearFilters">Limpar</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tabela de histórico -->
+                <div class="card">
+                    <div class="table-container">
+                        <table class="data-table" id="historyTable">
+                            <thead>
+                                <tr>
+                                    <th>Data/Hora</th>
+                                    <th>Item</th>
+                                    <th>Código</th>
+                                    <th>Barcode</th>
+                                    <th>Observação</th>
+                                </tr>
+                            </thead>
+                            <tbody id="historyBody">
+                                <!-- Dados carregados dinamicamente -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Paginação -->
+                    <div class="pagination" id="historyPagination">
+                        <!-- Gerada dinamicamente -->
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Barra de navegação inferior -->
+        <nav class="bottom-nav">
+            <button class="nav-item active" data-section="sectionDashboard" id="navDashboard">
+                <span class="nav-icon">🏠</span>
+                <span class="nav-label">Dashboard</span>
+            </button>
+            <button class="nav-item" data-section="sectionScanner" id="navScanner">
+                <span class="nav-icon">📷</span>
+                <span class="nav-label">Scanner</span>
+            </button>
+            <button class="nav-item" data-section="sectionCadastro" id="navCadastro">
+                <span class="nav-icon">📦</span>
+                <span class="nav-label">Cadastro</span>
+            </button>
+            <button class="nav-item" data-section="sectionHistorico" id="navHistorico">
+                <span class="nav-icon">📋</span>
+                <span class="nav-label">Histórico</span>
+            </button>
+        </nav>
+    </div>
+
+    <!-- Modal de entrada manual -->
+    <div class="modal-overlay" id="modalManualInput">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>⌨️ Digitar Código de Barras</h3>
+                <button class="btn btn-ghost btn-icon" onclick="closeModal('modalManualInput')">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="manualBarcodeInput">Código de barras</label>
+                    <input type="text" id="manualBarcodeInput" class="form-input" placeholder="Digite o código de barras">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('modalManualInput')">Cancelar</button>
+                <button class="btn btn-primary" id="btnSubmitManualBarcode">Verificar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de confirmação de leitura -->
+    <div class="modal-overlay" id="modalScanConfirm">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="scanConfirmTitle">Confirmar Leitura</h3>
+                <button class="btn btn-ghost btn-icon" onclick="closeModal('modalScanConfirm')">✕</button>
+            </div>
+            <div class="modal-body">
+                <div id="scanConfirmContent">
+                    <!-- Conteúdo dinâmico -->
+                </div>
+                <div class="form-group mt-4">
+                    <label for="scanNotes">Observação (opcional)</label>
+                    <textarea id="scanNotes" class="form-input" placeholder="Adicione uma observação para esta leitura..." rows="2"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('modalScanConfirm')">Cancelar</button>
+                <button class="btn btn-success" id="btnConfirmScan">✅ Registrar Leitura</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de cadastro rápido (quando barcode não encontrado) -->
+    <div class="modal-overlay" id="modalQuickRegister">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>📦 Cadastrar Novo Item</h3>
+                <button class="btn btn-ghost btn-icon" onclick="closeModal('modalQuickRegister')">✕</button>
+            </div>
+            <div class="modal-body">
+                <p style="color: var(--text-secondary); margin-bottom: var(--space-4);">
+                    O código <strong id="quickBarcodeValue" style="color: var(--warning-400);"></strong> não foi encontrado. Deseja cadastrar um novo item?
+                </p>
+                <div class="form-group">
+                    <label for="quickItemName">Nome do item *</label>
+                    <input type="text" id="quickItemName" class="form-input" placeholder="Ex: Produto A" required>
+                </div>
+                <div class="form-group">
+                    <label for="quickItemCode">Código interno *</label>
+                    <input type="text" id="quickItemCode" class="form-input" placeholder="Ex: PA-001" required>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('modalQuickRegister')">Cancelar</button>
+                <button class="btn btn-success" id="btnQuickRegister">💾 Cadastrar e Registrar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal scanner para cadastro -->
+    <div class="modal-overlay" id="modalBarcodeScanner">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>📷 Escanear Barcode</h3>
+                <button class="btn btn-ghost btn-icon" onclick="closeBarcodeModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="scanner-viewport" style="max-width: 100%; aspect-ratio: 4/3;">
+                    <video id="modalScannerVideo" playsinline autoplay muted style="width:100%;height:100%;object-fit:cover;"></video>
+                    <div class="scanner-overlay">
+                        <div class="scanner-frame">
+                            <div class="corner-bl"></div>
+                            <div class="corner-br"></div>
+                        </div>
+                        <div class="scan-line"></div>
+                    </div>
+                </div>
+                <p class="scanner-status mt-2" id="modalScannerStatus">Aponte a câmera para o código de barras</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast container -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <!-- Scripts -->
+    <script src="supabase.js"></script>
+    <script src="scanner.js"></script>
+    <script src="app.js"></script>
+
+    <!-- Service Worker -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js')
+                .then(reg => console.log('Service Worker registrado:', reg.scope))
+                .catch(err => console.error('Erro ao registrar SW:', err));
+        }
+    </script>
+</body>
+</html>
