@@ -223,18 +223,22 @@ async function loadDashboard() {
             .from('barcodes')
             .select('*', { count: 'exact', head: true });
 
-        // Leituras de hoje
+        // Leituras de hoje (Somar quantidades)
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        const { count: todayCount } = await supabaseClient
+        const { data: todayScans, error: todayError } = await supabaseClient
             .from('scan_logs')
-            .select('*', { count: 'exact', head: true })
+            .select('quantity')
             .gte('scanned_at', today.toISOString());
 
-        // Total de leituras
-        const { count: totalCount } = await supabaseClient
+        const todayCount = (todayScans || []).reduce((acc, curr) => acc + (curr.quantity || 1), 0);
+
+        // Total de leituras (Somar quantidades)
+        const { data: totalScans, error: totalError } = await supabaseClient
             .from('scan_logs')
-            .select('*', { count: 'exact', head: true });
+            .select('quantity');
+
+        const totalCount = (totalScans || []).reduce((acc, curr) => acc + (curr.quantity || 1), 0);
 
         // Atualizar UI
         document.getElementById('statItems').textContent = itemCount || 0;
@@ -258,6 +262,7 @@ async function loadRecentScans() {
             id,
             scanned_at,
             notes,
+            quantity,
             items ( name, code ),
             barcodes ( barcode_value )
         `)
@@ -285,8 +290,9 @@ async function loadRecentScans() {
                     ${scan.notes ? `<span class="badge badge-orange" title="${escapeHtml(scan.notes)}">💬</span>` : ''}
                 </div>
             </div>
-            <div style="text-align:right; font-size:var(--font-xs); color:var(--text-secondary);">
-                ${formatDateTime(scan.scanned_at)}
+            <div style="text-align:right;">
+                <div style="font-size:var(--font-xs); color:var(--text-secondary);">${formatDateTime(scan.scanned_at)}</div>
+                <div class="badge badge-green" style="margin-top:4px;">Qtd: ${scan.quantity || 1}</div>
             </div>
         </div>
     `).join('') + '</div>';
@@ -357,23 +363,54 @@ async function handleBarcodeDetected(code, format) {
         if (error) throw error;
 
         if (barcodeData && barcodeData.items) {
-            // Barcode encontrado! Registro Automático (Modo Rápido)
+            // Barcode encontrado! Registro Automático com Agrupamento (Modo Rápido)
             status.textContent = `✅ Registrado: ${barcodeData.items.name}`;
             status.className = 'scanner-status found';
 
             // Piscar a tela como feedback visual
             flashScannerViewport();
 
-            // Registrar no banco imediatamente
-            const { error: insertError } = await supabaseClient
-                .from('scan_logs')
-                .insert({
-                    barcode_id: barcodeData.id,
-                    item_id: barcodeData.items.id,
-                    user_id: null
-                });
+            // Verificar se já existe um registro hoje para este item/barcode
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const tomorrow = new Date(today);
+            tomorrow.setDate(tomorrow.getDate() + 1);
 
-            if (insertError) throw insertError;
+            const { data: existingLog, error: searchError } = await supabaseClient
+                .from('scan_logs')
+                .select('id, quantity')
+                .eq('item_id', barcodeData.items.id)
+                .eq('barcode_id', barcodeData.id)
+                .gte('scanned_at', today.toISOString())
+                .lt('scanned_at', tomorrow.toISOString())
+                .maybeSingle();
+
+            if (searchError) throw searchError;
+
+            if (existingLog) {
+                // Atualizar quantidade
+                const { error: updateError } = await supabaseClient
+                    .from('scan_logs')
+                    .update({ 
+                        quantity: (existingLog.quantity || 1) + 1,
+                        scanned_at: new Date().toISOString() 
+                    })
+                    .eq('id', existingLog.id);
+                
+                if (updateError) throw updateError;
+            } else {
+                // Criar novo registro
+                const { error: insertError } = await supabaseClient
+                    .from('scan_logs')
+                    .insert({
+                        barcode_id: barcodeData.id,
+                        item_id: barcodeData.items.id,
+                        user_id: null,
+                        quantity: 1
+                    });
+
+                if (insertError) throw insertError;
+            }
 
             // Atualizar contadores
             appState.sessionScanCount++;
@@ -884,6 +921,7 @@ async function loadHistory() {
                 id,
                 scanned_at,
                 notes,
+                quantity,
                 items ( name, code ),
                 barcodes ( barcode_value )
             `, { count: 'exact' })
@@ -934,7 +972,7 @@ async function loadHistory() {
                 <td>${formatDateTime(scan.scanned_at)}</td>
                 <td>${escapeHtml(scan.items?.name || 'Item removido')}</td>
                 <td><span class="badge badge-blue">${escapeHtml(scan.items?.code || '—')}</span></td>
-                <td><span class="barcode-tag" style="display:inline-flex;">${escapeHtml(scan.barcodes?.barcode_value || '—')}</span></td>
+                <td><span class="badge badge-green">${scan.quantity || 1}</span></td>
                 <td>${scan.notes ? escapeHtml(scan.notes) : '<span style="color:var(--text-tertiary);">—</span>'}</td>
             </tr>
         `).join('');
@@ -1015,6 +1053,7 @@ async function exportCSV() {
                 id,
                 scanned_at,
                 notes,
+                quantity,
                 items ( name, code ),
                 barcodes ( barcode_value )
             `)
@@ -1051,9 +1090,9 @@ async function exportCSV() {
         }
 
         // Gerar CSV
-        const header = 'Data/Hora,Item,Código,Barcode,Observação\n';
+        const header = 'Data/Hora,Item,Código,Barcode,Quantidade,Observação\n';
         const csvRows = rows.map(r =>
-            `"${formatDateTime(r.scanned_at)}","${r.items?.name || ''}","${r.items?.code || ''}","${r.barcodes?.barcode_value || ''}","${(r.notes || '').replace(/"/g, '""')}"`
+            `"${formatDateTime(r.scanned_at)}","${r.items?.name || ''}","${r.items?.code || ''}","${r.barcodes?.barcode_value || ''}","${r.quantity || 1}","${(r.notes || '').replace(/"/g, '""')}"`
         ).join('\n');
 
         const csv = '\uFEFF' + header + csvRows; // BOM para UTF-8 no Excel
