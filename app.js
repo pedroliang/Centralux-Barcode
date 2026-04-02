@@ -19,7 +19,10 @@ const appState = {
     historyTotal: 0,
     pendingScanBarcode: null,  // Barcode lido aguardando confirmação
     pendingScanItem: null,     // Item encontrado para o barcode lido
-    pendingScanBarcodeId: null // ID do barcode encontrado
+    pendingScanBarcodeId: null, // ID do barcode encontrado
+    lastScanCode: null,        // Para de-bounce
+    lastScanTime: 0,           // Para de-bounce
+    isProcessingScan: false    // Trava de processamento
 };
 
 // ============================================
@@ -146,29 +149,28 @@ function setupBluetoothScanner() {
     window.addEventListener('keydown', (e) => {
         // Ignorar se o foco estiver em um input de texto real
         const tagName = document.activeElement.tagName.toLowerCase();
-        const type = document.activeElement.type?.toLowerCase();
         
-        // Exceções: Permitir capturar se estiver no input de busca ou barcode do formulário
-        // mas o leitor físico enviará um 'Enter' no final, o que já tratamos nos inputs.
-        // O caso principal aqui é o Dashboard ou quando nenhuma entrada está focada.
         if (tagName === 'input' || tagName === 'textarea') {
             return;
         }
 
         const currentTime = Date.now();
         
-        // Se o tempo entre as teclas for > 50ms, provavelmente não é um scanner físico
-        if (currentTime - lastKeyTime > 50) {
+        // Se o tempo entre as teclas for > 200ms, provavelmente não é um scanner físico
+        // Aumentado de 50ms para 200ms para estabilidade em conexões Bluetooth
+        if (currentTime - lastKeyTime > 200) {
             buffer = '';
         }
 
         if (e.key === 'Enter') {
-            if (buffer.length > 2) { // Evitar disparar com apenas 1 ou 2 caracteres
-                console.log('📡 Código capturado via Bluetooth HID:', buffer);
-                handleBarcodeDetected(buffer, 'HID');
+            e.preventDefault(); // Evitar comportamentos indesejados
+            if (buffer.length > 2) { 
+                const finalCode = buffer.trim();
+                console.log('📡 Código capturado via Bluetooth HID:', finalCode);
+                handleBarcodeDetected(finalCode, 'HID');
                 buffer = '';
             }
-        } else if (e.key.length === 1) { // Apenas caracteres simples
+        } else if (e.key.length === 1) { 
             buffer += e.key;
         }
 
@@ -342,11 +344,27 @@ function stopMainScanner() {
 }
 
 async function handleBarcodeDetected(code, format) {
+    // Trava de processamento para evitar bipes simultâneos
+    if (appState.isProcessingScan) return;
+    
+    // De-bounce: Ignorar o mesmo código se lido em menos de 500ms (proteção contra ghost scans do hardware)
+    const now = Date.now();
+    if (code === appState.lastScanCode && now - appState.lastScanTime < 500) {
+        console.log('🛡️ Bipe duplicado ignorado (de-bounce)');
+        return;
+    }
+
+    appState.isProcessingScan = true;
+    appState.lastScanCode = code;
+    appState.lastScanTime = now;
+
     console.log(`📊 Barcode detectado: ${code} (formato: ${format})`);
     const status = document.getElementById('scannerStatus');
 
-    status.textContent = `Verificando código: ${code}...`;
-    status.className = 'scanner-status';
+    if (status) {
+        status.textContent = `Verificando código: ${code}...`;
+        status.className = 'scanner-status';
+    }
 
     try {
         // Buscar barcode no banco
@@ -435,9 +453,13 @@ async function handleBarcodeDetected(code, format) {
         }
     } catch (err) {
         console.error('Erro ao verificar barcode:', err);
-        status.textContent = 'Erro ao verificar código';
-        status.className = 'scanner-status not-found';
+        if (status) {
+            status.textContent = 'Erro ao verificar código';
+            status.className = 'scanner-status not-found';
+        }
         showToast('Erro', 'Não foi possível verificar o código', 'error');
+    } finally {
+        appState.isProcessingScan = false;
     }
 }
 
