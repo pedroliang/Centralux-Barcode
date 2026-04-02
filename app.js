@@ -26,25 +26,17 @@ const appState = {
 // Inicialização
 // ============================================
 (async () => {
-    // Verificar autenticação
-    const { data: { session } } = await supabaseClient.auth.getSession();
-
-    if (!session) {
-        window.location.href = 'index.html';
-        return;
-    }
-
-    appState.user = session.user;
+    // Modo Uso Pessoal (Sem Login)
+    // Inicializar UI diretamente
     initUI();
     await loadDashboard();
+    
+    // Identificar usuário local (opcional)
+    appState.user = { id: null, email: 'Uso Pessoal' };
 })();
 
-// Ouvir mudanças na autenticação
-supabaseClient.auth.onAuthStateChange((event, session) => {
-    if (event === 'SIGNED_OUT' || !session) {
-        window.location.href = 'index.html';
-    }
-});
+// Remover ouvintes de autenticação desnecessários
+// supabaseClient.auth.onAuthStateChange...
 
 // ============================================
 // Inicializar UI
@@ -367,7 +359,7 @@ async function confirmScan() {
             .insert({
                 barcode_id: appState.pendingScanBarcodeId,
                 item_id: appState.pendingScanItem.id,
-                user_id: appState.user.id,
+                user_id: null,
                 notes: notes || null
             });
 
@@ -410,7 +402,7 @@ async function handleQuickRegister() {
         // Criar item
         const { data: item, error: itemError } = await supabaseClient
             .from('items')
-            .insert({ name, code, user_id: appState.user.id })
+            .insert({ name, code, user_id: null })
             .select()
             .single();
 
@@ -422,7 +414,7 @@ async function handleQuickRegister() {
             .insert({
                 item_id: item.id,
                 barcode_value: barcodeValue,
-                user_id: appState.user.id
+                user_id: null
             })
             .select()
             .single();
@@ -435,7 +427,7 @@ async function handleQuickRegister() {
             .insert({
                 barcode_id: barcode.id,
                 item_id: item.id,
-                user_id: appState.user.id
+                user_id: null
             });
 
         if (scanError) throw scanError;
@@ -557,7 +549,7 @@ async function handleItemSubmit(e) {
             // Criar novo item
             const { data, error } = await supabaseClient
                 .from('items')
-                .insert({ name, code, user_id: appState.user.id })
+                .insert({ name, code, user_id: null })
                 .select()
                 .single();
 
@@ -571,7 +563,7 @@ async function handleItemSubmit(e) {
             const barcodesToInsert = appState.pendingBarcodes.map(bc => ({
                 item_id: itemId,
                 barcode_value: bc,
-                user_id: appState.user.id
+                user_id: null
             }));
 
             const { error: bcError } = await supabaseClient
