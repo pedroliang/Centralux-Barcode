@@ -23,6 +23,35 @@ const appState = {
 };
 
 // ============================================
+// Feedback Visual
+// ============================================
+function flashScannerViewport() {
+    const viewport = document.getElementById('scannerViewport');
+    if (!viewport) return;
+
+    const flash = document.createElement('div');
+    flash.style.position = 'absolute';
+    flash.style.top = '0';
+    flash.style.left = '0';
+    flash.style.width = '100%';
+    flash.style.height = '100%';
+    flash.style.backgroundColor = 'rgba(34, 197, 94, 0.4)';
+    flash.style.zIndex = '5';
+    flash.style.transition = 'opacity 0.2s ease-out';
+    flash.style.pointerEvents = 'none';
+
+    viewport.appendChild(flash);
+
+    setTimeout(() => {
+        flash.style.opacity = '0';
+        setTimeout(() => flash.remove(), 200);
+    }, 50);
+}
+
+// ============================================
+// Utilidades
+// ============================================
+// ============================================
 // Inicialização
 // ============================================
 (async () => {
@@ -328,18 +357,36 @@ async function handleBarcodeDetected(code, format) {
         if (error) throw error;
 
         if (barcodeData && barcodeData.items) {
-            // Barcode encontrado!
-            status.textContent = `✅ Encontrado: ${barcodeData.items.name}`;
+            // Barcode encontrado! Registro Automático (Modo Rápido)
+            status.textContent = `✅ Registrado: ${barcodeData.items.name}`;
             status.className = 'scanner-status found';
 
-            appState.pendingScanBarcode = code;
-            appState.pendingScanItem = barcodeData.items;
-            appState.pendingScanBarcodeId = barcodeData.id;
+            // Piscar a tela como feedback visual
+            flashScannerViewport();
 
-            // Mostrar modal de confirmação
-            showScanConfirmModal(barcodeData.items, code, true);
+            // Registrar no banco imediatamente
+            const { error: insertError } = await supabaseClient
+                .from('scan_logs')
+                .insert({
+                    barcode_id: barcodeData.id,
+                    item_id: barcodeData.items.id,
+                    user_id: null
+                });
+
+            if (insertError) throw insertError;
+
+            // Atualizar contadores
+            appState.sessionScanCount++;
+            const sessionEl = document.getElementById('sessionCount');
+            if (sessionEl) sessionEl.textContent = appState.sessionScanCount;
+            
+            showToast('Sucesso', `${barcodeData.items.name} registrado!`, 'success', 1000);
+            
+            // Recarregar dashboard se estiver visível
+            if (appState.currentSection === 'sectionDashboard') loadDashboard();
+
         } else {
-            // Barcode não encontrado
+            // Barcode não encontrado — Manter modal para cadastro
             status.textContent = `⚠️ Código não cadastrado: ${code}`;
             status.className = 'scanner-status not-found';
 
@@ -347,7 +394,6 @@ async function handleBarcodeDetected(code, format) {
             appState.pendingScanItem = null;
             appState.pendingScanBarcodeId = null;
 
-            // Mostrar opção de cadastrar
             showNotFoundModal(code);
         }
     } catch (err) {
