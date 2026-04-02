@@ -33,11 +33,11 @@ jobs:
       - name: Substituir variáveis de ambiente
         run: |
           # Substituir placeholders pelas variáveis de ambiente
-          if [ -n "${{ secrets.SUPABASE_URL }}" ]; then
-            sed -i "s|%%SUPABASE_URL%%|${{ secrets.SUPABASE_URL }}|g" supabase.js
+          if [ -n "${{ vars.SUPABASE_URL }}" ]; then
+            sed -i "s|%%SUPABASE_URL%%|${{ vars.SUPABASE_URL }}|g" supabase.js
           fi
-          if [ -n "${{ secrets.SUPABASE_ANON_KEY }}" ]; then
-            sed -i "s|%%SUPABASE_ANON_KEY%%|${{ secrets.SUPABASE_ANON_KEY }}|g" supabase.js
+          if [ -n "${{ vars.SUPABASE_ANON_KEY }}" ]; then
+            sed -i "s|%%SUPABASE_ANON_KEY%%|${{ vars.SUPABASE_ANON_KEY }}|g" supabase.js
           fi
 
       - name: Setup Pages
