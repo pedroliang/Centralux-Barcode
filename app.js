@@ -20,9 +20,8 @@ const appState = {
     pendingScanBarcode: null,  // Barcode lido aguardando confirmação
     pendingScanItem: null,     // Item encontrado para o barcode lido
     pendingScanBarcodeId: null, // ID do barcode encontrado
-    lastScanCode: null,        // Para de-bounce
-    lastScanTime: 0,           // Para de-bounce
-    isProcessingScan: false    // Trava de processamento
+    scanQueue: [],             // Fila de processamento para precisão total
+    isQueueProcessing: false   // Trava para o processador de fila
 };
 
 // ============================================
@@ -344,123 +343,126 @@ function stopMainScanner() {
 }
 
 async function handleBarcodeDetected(code, format) {
-    // Trava de processamento para evitar bipes simultâneos
-    if (appState.isProcessingScan) return;
+    // Feedback Instantâneo: Garantir que o bipe seja contabilizado na UI na hora
+    appState.scanQueue.push({ code, format, timestamp: Date.now() });
+
+    console.log(`📊 Bipe capturado e enfileirado: ${code}`);
     
-    // De-bounce: Ignorar o mesmo código se lido em menos de 500ms (proteção contra ghost scans do hardware)
-    const now = Date.now();
-    if (code === appState.lastScanCode && now - appState.lastScanTime < 500) {
-        console.log('🛡️ Bipe duplicado ignorado (de-bounce)');
-        return;
-    }
+    // Feedback Visual imediato
+    flashScannerViewport();
+    
+    // Incrementar contador da sessão na UI imediatamente (feedback visual "certeiro")
+    appState.sessionScanCount++;
+    const sessionEl = document.getElementById('sessionCount');
+    if (sessionEl) sessionEl.textContent = appState.sessionScanCount;
 
-    appState.isProcessingScan = true;
-    appState.lastScanCode = code;
-    appState.lastScanTime = now;
-
-    console.log(`📊 Barcode detectado: ${code} (formato: ${format})`);
     const status = document.getElementById('scannerStatus');
-
     if (status) {
-        status.textContent = `Verificando código: ${code}...`;
-        status.className = 'scanner-status';
+        status.textContent = `Processando: ${code}... (${appState.scanQueue.length} na fila)`;
+        status.className = 'scanner-status found';
     }
 
-    try {
-        // Buscar barcode no banco
-        const { data: barcodeData, error } = await supabaseClient
-            .from('barcodes')
-            .select(`
-                id,
-                barcode_value,
-                items ( id, name, code )
-            `)
-            .eq('barcode_value', code)
-            .maybeSingle();
+    // Iniciar processador de fila se não estiver rodando
+    processScanQueue();
+}
 
-        if (error) throw error;
+async function processScanQueue() {
+    if (appState.isQueueProcessing) return;
+    appState.isQueueProcessing = true;
 
-        if (barcodeData && barcodeData.items) {
-            // Barcode encontrado! Registro Automático com Agrupamento (Modo Rápido)
-            status.textContent = `✅ Registrado: ${barcodeData.items.name}`;
-            status.className = 'scanner-status found';
-
-            // Piscar a tela como feedback visual
-            flashScannerViewport();
-
-            // Verificar se já existe um registro hoje para este item/barcode
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            const tomorrow = new Date(today);
-            tomorrow.setDate(tomorrow.getDate() + 1);
-
-            const { data: existingLog, error: searchError } = await supabaseClient
-                .from('scan_logs')
-                .select('id, quantity')
-                .eq('item_id', barcodeData.items.id)
-                .eq('barcode_id', barcodeData.id)
-                .gte('scanned_at', today.toISOString())
-                .lt('scanned_at', tomorrow.toISOString())
+    while (appState.scanQueue.length > 0) {
+        const { code, format } = appState.scanQueue.shift();
+        const status = document.getElementById('scannerStatus');
+        
+        try {
+            // Buscar barcode no banco
+            const { data: barcodeData, error } = await supabaseClient
+                .from('barcodes')
+                .select(`
+                    id,
+                    barcode_value,
+                    items ( id, name, code )
+                `)
+                .eq('barcode_value', code)
                 .maybeSingle();
 
-            if (searchError) throw searchError;
+            if (error) throw error;
 
-            if (existingLog) {
-                // Atualizar quantidade
-                const { error: updateError } = await supabaseClient
+            if (barcodeData && barcodeData.items) {
+                // Barcode encontrado! Registro Automático com Agrupamento
+                if (status) status.textContent = `✅ Gravado: ${barcodeData.items.name}`;
+
+                // Verificar se já existe um registro hoje para este item/barcode
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const tomorrow = new Date(today);
+                tomorrow.setDate(tomorrow.getDate() + 1);
+
+                const { data: existingLog, error: searchError } = await supabaseClient
                     .from('scan_logs')
-                    .update({ 
-                        quantity: (existingLog.quantity || 1) + 1,
-                        scanned_at: new Date().toISOString() 
-                    })
-                    .eq('id', existingLog.id);
+                    .select('id, quantity')
+                    .eq('item_id', barcodeData.items.id)
+                    .eq('barcode_id', barcodeData.id)
+                    .gte('scanned_at', today.toISOString())
+                    .lt('scanned_at', tomorrow.toISOString())
+                    .maybeSingle();
+
+                if (searchError) throw searchError;
+
+                if (existingLog) {
+                    // Atualizar quantidade
+                    const { error: updateError } = await supabaseClient
+                        .from('scan_logs')
+                        .update({ 
+                            quantity: (existingLog.quantity || 1) + 1,
+                            scanned_at: new Date().toISOString() 
+                        })
+                        .eq('id', existingLog.id);
+                    
+                    if (updateError) throw updateError;
+                } else {
+                    // Criar novo registro
+                    const { error: insertError } = await supabaseClient
+                        .from('scan_logs')
+                        .insert({
+                            barcode_id: barcodeData.id,
+                            item_id: barcodeData.items.id,
+                            user_id: null,
+                            quantity: 1
+                        });
+
+                    if (insertError) throw insertError;
+                }
+
+                showToast('Sucesso', `${barcodeData.items.name} registrado!`, 'success', 800);
                 
-                if (updateError) throw updateError;
+                // Recarregar dashboard se estiver visível
+                if (appState.currentSection === 'sectionDashboard') loadDashboard();
+
             } else {
-                // Criar novo registro
-                const { error: insertError } = await supabaseClient
-                    .from('scan_logs')
-                    .insert({
-                        barcode_id: barcodeData.id,
-                        item_id: barcodeData.items.id,
-                        user_id: null,
-                        quantity: 1
-                    });
+                // Barcode não encontrado — Pausar fila para cadastro manual
+                if (status) {
+                    status.textContent = `⚠️ Código novo: ${code}`;
+                    status.className = 'scanner-status not-found';
+                }
 
-                if (insertError) throw insertError;
+                appState.pendingScanBarcode = code;
+                appState.pendingScanItem = null;
+                appState.pendingScanBarcodeId = null;
+
+                // Mostra o modal e limpa a fila para evitar bipes sucessivos ficarem "atrás" do modal
+                // (ou poderíamos deixar na fila, mas por segurança de UX, melhor pausar)
+                showNotFoundModal(code);
+                appState.scanQueue = []; 
+                break; 
             }
-
-            // Atualizar contadores
-            appState.sessionScanCount++;
-            const sessionEl = document.getElementById('sessionCount');
-            if (sessionEl) sessionEl.textContent = appState.sessionScanCount;
-            
-            showToast('Sucesso', `${barcodeData.items.name} registrado!`, 'success', 1000);
-            
-            // Recarregar dashboard se estiver visível
-            if (appState.currentSection === 'sectionDashboard') loadDashboard();
-
-        } else {
-            // Barcode não encontrado — Manter modal para cadastro
-            status.textContent = `⚠️ Código não cadastrado: ${code}`;
-            status.className = 'scanner-status not-found';
-
-            appState.pendingScanBarcode = code;
-            appState.pendingScanItem = null;
-            appState.pendingScanBarcodeId = null;
-
-            showNotFoundModal(code);
+        } catch (err) {
+            console.error('Erro ao processar item da fila:', err);
+            showToast('Erro de Registro', `Falha ao gravar código ${code}`, 'error');
         }
-    } catch (err) {
-        console.error('Erro ao verificar barcode:', err);
-        if (status) {
-            status.textContent = 'Erro ao verificar código';
-            status.className = 'scanner-status not-found';
-        }
-        showToast('Erro', 'Não foi possível verificar o código', 'error');
-    } finally {
-        appState.isProcessingScan = false;
     }
+
+    appState.isQueueProcessing = false;
 }
 
 function showScanConfirmModal(item, barcodeValue, found) {
