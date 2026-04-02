@@ -42,21 +42,33 @@ const appState = {
 // Inicializar UI
 // ============================================
 function initUI() {
-    // Exibir dados do usuário
-    const email = appState.user.email || '';
-    document.getElementById('userEmail').textContent = email;
-    document.getElementById('userAvatar').textContent = email.charAt(0).toUpperCase();
+    // Exibir dados do usuário (se os elementos existirem)
+    const email = appState.user?.email || '';
+    const userEmailEl = document.getElementById('userEmail');
+    const userAvatarEl = document.getElementById('userAvatar');
+
+    if (userEmailEl) userEmailEl.textContent = email;
+    if (userAvatarEl) userAvatarEl.textContent = email.charAt(0).toUpperCase();
 
     // Navegação
     document.querySelectorAll('.nav-item').forEach(btn => {
-        btn.addEventListener('click', () => navigateTo(btn.dataset.section));
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            navigateTo(btn.dataset.section);
+        });
     });
 
-    // Logout
-    document.getElementById('btnLogout').addEventListener('click', async () => {
-        await supabaseClient.auth.signOut();
-        window.location.href = 'index.html';
-    });
+    // Logout (se existir)
+    const btnLogout = document.getElementById('btnLogout');
+    if (btnLogout) {
+        btnLogout.addEventListener('click', async () => {
+            await supabaseClient.auth.signOut();
+            window.location.href = 'index.html';
+        });
+    }
+
+    // Configurar leitor Bluetooth (HID)
+    setupBluetoothScanner();
 
     // Scanner
     document.getElementById('btnStartScanner').addEventListener('click', startMainScanner);
@@ -96,8 +108,44 @@ function initUI() {
 }
 
 // ============================================
-// Navegação entre seções
+// Suporte a Leitor Bluetooth / USB (HID Keyboard)
 // ============================================
+function setupBluetoothScanner() {
+    let buffer = '';
+    let lastKeyTime = Date.now();
+
+    window.addEventListener('keydown', (e) => {
+        // Ignorar se o foco estiver em um input de texto real
+        const tagName = document.activeElement.tagName.toLowerCase();
+        const type = document.activeElement.type?.toLowerCase();
+        
+        // Exceções: Permitir capturar se estiver no input de busca ou barcode do formulário
+        // mas o leitor físico enviará um 'Enter' no final, o que já tratamos nos inputs.
+        // O caso principal aqui é o Dashboard ou quando nenhuma entrada está focada.
+        if (tagName === 'input' || tagName === 'textarea') {
+            return;
+        }
+
+        const currentTime = Date.now();
+        
+        // Se o tempo entre as teclas for > 50ms, provavelmente não é um scanner físico
+        if (currentTime - lastKeyTime > 50) {
+            buffer = '';
+        }
+
+        if (e.key === 'Enter') {
+            if (buffer.length > 2) { // Evitar disparar com apenas 1 ou 2 caracteres
+                console.log('📡 Código capturado via Bluetooth HID:', buffer);
+                handleBarcodeDetected(buffer, 'HID');
+                buffer = '';
+            }
+        } else if (e.key.length === 1) { // Apenas caracteres simples
+            buffer += e.key;
+        }
+
+        lastKeyTime = currentTime;
+    });
+}
 function navigateTo(sectionId) {
     // Parar scanner se sair da aba
     if (appState.currentSection === 'sectionScanner' && sectionId !== 'sectionScanner') {
